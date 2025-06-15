@@ -2,58 +2,285 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-    <script>
-      const regex = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$";
-      function pickTextColorBasedOnBgColorAdvanced(
-        bgColor,
-        lightColor,
-        darkColor,
-      ) {
-        var color =
-          bgColor.charAt(0) === "#" ? bgColor.substring(1, 7) : bgColor;
-        var r = parseInt(color.substring(0, 2), 16); // hexToR
-        var g = parseInt(color.substring(2, 4), 16); // hexToG
-        var b = parseInt(color.substring(4, 6), 16); // hexToB
-        var uicolors = [r / 255, g / 255, b / 255];
-        var c = uicolors.map((col) => {
-          if (col <= 0.03928) {
-            return col / 12.92;
-          }
-          return Math.pow((col + 0.055) / 1.055, 2.4);
-        });
-        var L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-        return L > 0.179 ? darkColor : lightColor;
+    <title>Dynamic Color Changer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        text-align: center;
+        transition:
+          background-color 0.3s ease,
+          color 0.3s ease;
       }
-      function change() {
-        if (document.getElementById("inp").value.match(regex)) {
-          console.log("match");
-          document.body.style.backgroundColor =
-            document.getElementById("inp").value;
-          document.body.style.color = pickTextColorBasedOnBgColorAdvanced(
-            document.getElementById("inp").value,
-            "#FFF",
-            "#000",
-          );
-        }
+
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
       }
-    </script>
+
+      h1 {
+        margin-bottom: 20px;
+        font-size: 2em;
+      }
+
+      p {
+        margin-bottom: 30px;
+        line-height: 1.6;
+        font-size: 1.1em;
+      }
+
+      .input-group {
+        margin-bottom: 20px;
+      }
+
+      #colorInput {
+        padding: 10px;
+        font-size: 16px;
+        border: 2px solid #ccc;
+        border-radius: 5px;
+        margin-right: 10px;
+        width: 150px;
+      }
+
+      #colorInput:focus {
+        outline: none;
+        border-color: #007bff;
+      }
+
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+
+      button:hover {
+        background-color: #0056b3;
+      }
+
+      .error-message {
+        color: #dc3545;
+        margin-top: 10px;
+        font-size: 14px;
+      }
+
+      .valid-message {
+        color: #28a745;
+        margin-top: 10px;
+        font-size: 14px;
+      }
+
+      .format-hint {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
   </head>
   <body>
-    <center>
-      <h1>
-        Change the color of the page, the text should be either black or white
-      </h1>
+    <div class="container">
+      <h1>Dynamic Color Changer</h1>
       <p>
-        Lorem ipsum dolor sit amet consectetur adipisicing elit. Dicta
-        voluptatibus sit accusantium enim cumque ullam provident fuga quod!
-        Optio dolor odit esse tempora neque quo ipsum beatae assumenda veritatis
-        facere.
+        Enter a hex color code to change the background color of this page. The
+        text color will automatically adjust to ensure optimal readability based
+        on the background brightness.
       </p>
-      <input type="text" id="inp" />
-      <button onclick="change()">Change color</button>
-    </center>
+
+      <div class="input-group">
+        <input
+          type="text"
+          id="colorInput"
+          placeholder="#FF5733 or #F53"
+          maxlength="7"
+        />
+        <button onclick="ColorChanger.changeColor()">Change Color</button>
+      </div>
+
+      <div id="messageContainer"></div>
+      <div class="format-hint">
+        Supported formats: #RRGGBB (e.g., #FF5733) or #RGB (e.g., #F53)
+      </div>
+    </div>
+
+    <script>
+      class ColorChanger {
+        static HEX_COLOR_REGEX = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+        static LUMINANCE_THRESHOLD = 0.179;
+        static LIGHT_TEXT_COLOR = "#FFFFFF";
+        static DARK_TEXT_COLOR = "#000000";
+
+        /**
+         * Validates if a string is a valid hex color
+         * @param {string} color - The color string to validate
+         * @returns {boolean} - True if valid hex color
+         */
+        static isValidHexColor(color) {
+          return this.HEX_COLOR_REGEX.test(color);
+        }
+
+        /**
+         * Normalizes a hex color to 6-digit format
+         * @param {string} color - The hex color (with or without #)
+         * @returns {string} - Normalized 6-digit hex color
+         */
+        static normalizeHexColor(color) {
+          // Remove # if present
+          let hex = color.charAt(0) === "#" ? color.substring(1) : color;
+
+          // Convert 3-digit to 6-digit format
+          if (hex.length === 3) {
+            hex = hex
+              .split("")
+              .map((char) => char + char)
+              .join("");
+          }
+
+          return hex;
+        }
+
+        /**
+         * Converts hex color to RGB values
+         * @param {string} hex - 6-digit hex color (without #)
+         * @returns {object} - RGB values {r, g, b}
+         */
+        static hexToRgb(hex) {
+          return {
+            r: parseInt(hex.substring(0, 2), 16),
+            g: parseInt(hex.substring(2, 4), 16),
+            b: parseInt(hex.substring(4, 6), 16),
+          };
+        }
+
+        /**
+         * Calculates the relative luminance of a color
+         * @param {object} rgb - RGB values {r, g, b}
+         * @returns {number} - Relative luminance (0-1)
+         */
+        static calculateLuminance(rgb) {
+          // Normalize RGB values to 0-1 range
+          const normalizedRgb = {
+            r: rgb.r / 255,
+            g: rgb.g / 255,
+            b: rgb.b / 255,
+          };
+
+          // Apply gamma correction
+          const linearRgb = Object.keys(normalizedRgb).reduce((acc, key) => {
+            const value = normalizedRgb[key];
+            acc[key] =
+              value <= 0.03928
+                ? value / 12.92
+                : Math.pow((value + 0.055) / 1.055, 2.4);
+            return acc;
+          }, {});
+
+          // Calculate luminance using the relative luminance formula
+          return (
+            0.2126 * linearRgb.r + 0.7152 * linearRgb.g + 0.0722 * linearRgb.b
+          );
+        }
+
+        /**
+         * Determines optimal text color based on background color
+         * @param {string} backgroundColor - Hex color of the background
+         * @returns {string} - Optimal text color (light or dark)
+         */
+        static getOptimalTextColor(backgroundColor) {
+          const normalizedHex = this.normalizeHexColor(backgroundColor);
+          const rgb = this.hexToRgb(normalizedHex);
+          const luminance = this.calculateLuminance(rgb);
+
+          return luminance > this.LUMINANCE_THRESHOLD
+            ? this.DARK_TEXT_COLOR
+            : this.LIGHT_TEXT_COLOR;
+        }
+
+        /**
+         * Displays a message to the user
+         * @param {string} message - The message to display
+         * @param {string} type - The type of message ('error' or 'success')
+         */
+        static showMessage(message, type = "error") {
+          const messageContainer = document.getElementById("messageContainer");
+          const className =
+            type === "error" ? "error-message" : "valid-message";
+          messageContainer.innerHTML = `<div class="${className}">${message}</div>`;
+
+          // Clear message after 3 seconds
+          setTimeout(() => {
+            messageContainer.innerHTML = "";
+          }, 3000);
+        }
+
+        /**
+         * Changes the page colors based on user input
+         */
+        static changeColor() {
+          const input = document.getElementById("colorInput");
+          const colorValue = input.value.trim();
+
+          if (!colorValue) {
+            this.showMessage("Please enter a color value.");
+            return;
+          }
+
+          if (!this.isValidHexColor(colorValue)) {
+            this.showMessage(
+              "Invalid hex color format. Please use #RRGGBB or #RGB format.",
+            );
+            return;
+          }
+
+          try {
+            const textColor = this.getOptimalTextColor(colorValue);
+
+            // Apply the colors
+            document.body.style.backgroundColor = colorValue;
+            document.body.style.color = textColor;
+
+            this.showMessage("Color changed successfully!", "success");
+          } catch (error) {
+            this.showMessage("An error occurred while changing the color.");
+            console.error("Color change error:", error);
+          }
+        }
+
+        /**
+         * Initializes the color changer
+         */
+        static init() {
+          const input = document.getElementById("colorInput");
+
+          // Allow Enter key to trigger color change
+          input.addEventListener("keypress", (event) => {
+            if (event.key === "Enter") {
+              this.changeColor();
+            }
+          });
+
+          // Real-time validation feedback
+          input.addEventListener("input", (event) => {
+            const value = event.target.value.trim();
+            if (value && !this.isValidHexColor(value)) {
+              input.style.borderColor = "#dc3545";
+            } else {
+              input.style.borderColor = "#ccc";
+            }
+          });
+        }
+      }
+
+      // Initialize the color changer when the page loads
+      document.addEventListener("DOMContentLoaded", () => {
+        ColorChanger.init();
+      });
+    </script>
   </body>
 </html>
